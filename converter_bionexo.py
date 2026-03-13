@@ -544,6 +544,9 @@ def save_excel_buffer(data):
     if df.empty:
         return None
 
+    drop_cols = ["Porcentagem (%)", "Justificativa", "Comentario", "Usuario"]
+    df.drop(columns=[c for c in drop_cols if c in df.columns], inplace=True)
+
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
         df.to_excel(writer, sheet_name="Dados", index=False)
