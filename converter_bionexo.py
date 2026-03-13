@@ -408,6 +408,7 @@ def process_pdf(pdf_path):
 # ── Exportacao para Excel ──────────────────────────────────────────────────────
 
 _COL_WIDTHS = {
+    "Unidade Hospitalar":     30,
     "Pedido de Cotacao":      16,
     "Data Emissao":           13,
     "Fornecedor":             35,
@@ -495,6 +496,8 @@ def process_pdf_buffer(pdf_bytes):
     supplier     = ""
     last_columns = None
 
+    hospital = ""
+
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         for pn, page in enumerate(pdf.pages):
             txt = page.extract_text() or ""
@@ -509,9 +512,21 @@ def process_pdf_buffer(pdf_bytes):
                 if m:
                     dt_emissao = m.group(1)
 
+            if not hospital:
+                lines = txt.split("\n")
+                for i, line in enumerate(lines):
+                    if line.strip() == "Comprador" and i + 1 < len(lines):
+                        raw = lines[i + 1].strip()
+                        hospital = raw.split("(")[0].split(",")[0].strip()
+                        break
+
             recs, supplier, last_columns = process_page(
                 page, supplier, pedido, dt_emissao, last_columns)
             all_records.extend(recs)
+
+    if hospital:
+        for i, rec in enumerate(all_records):
+            all_records[i] = {"Unidade Hospitalar": hospital, **rec}
 
     return all_records
 
