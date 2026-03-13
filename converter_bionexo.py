@@ -544,7 +544,7 @@ def save_excel_buffer(data):
     if df.empty:
         return None
 
-    drop_cols = ["Porcentagem (%)", "Justificativa", "Comentario", "Usuario"]
+    drop_cols = ["Porcentagem (%)", "Justificativa", "Comentario", "Usuario", "Item"]
     df.drop(columns=[c for c in drop_cols if c in df.columns], inplace=True)
 
     buf = io.BytesIO()
