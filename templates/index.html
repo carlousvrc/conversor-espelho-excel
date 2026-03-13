@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conversor PDF → Excel | Rede Hospital Casa</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue:       #116dff;
+      --blue-dark:  #0a56d0;
+      --blue-light: #e8f0ff;
+      --orange:     #ea492e;
+      --orange-dark:#c73820;
+      --text:       #080808;
+      --text-muted: #959595;
+      --bg:         #f4f6fa;
+      --white:      #ffffff;
+      --border:     #dde3ee;
+      --green:      #1a7f3c;
+      --green-light:#e6f4ec;
+      --green-border:#a3d4b3;
+    }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top Bar ─────────────────────────────────────── */
+    .topbar {
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    .topbar img {
+      height: 48px;
+      object-fit: contain;
+    }
+    .topbar-divider {
+      width: 1px;
+      height: 36px;
+      background: var(--border);
+    }
+    .topbar-title {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .topbar-title span:first-child {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--blue);
+      letter-spacing: -0.2px;
+    }
+    .topbar-title span:last-child {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    /* ── Page Body ───────────────────────────────────── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px 60px;
+    }
+
+    /* ── Hero ────────────────────────────────────────── */
+    .hero {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .hero h1 {
+      font-size: 1.55rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+    .hero h1 span { color: var(--blue); }
+    .hero p {
+      margin-top: 8px;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    /* ── Card ────────────────────────────────────────── */
+    .card {
+      background: var(--white);
+      border-radius: 14px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+      padding: 32px 36px;
+      width: 100%;
+      max-width: 640px;
+    }
+
+    /* ── Drop Zone ───────────────────────────────────── */
+    #drop-zone {
+      border: 2.5px dashed #aac4f0;
+      border-radius: 10px;
+      padding: 42px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s;
+      background: var(--blue-light);
+    }
+    #drop-zone:hover, #drop-zone.drag-over {
+      background: #d5e5ff;
+      border-color: var(--blue);
+    }
+    #drop-zone svg { display: block; margin: 0 auto 12px; color: var(--blue); }
+    #drop-zone p { font-size: 0.97rem; color: #3a5a88; }
+    #drop-zone .browse {
+      color: var(--blue);
+      font-weight: 700;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    #drop-zone .hint {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+    #file-input { display: none; }
+
+    /* ── File List ───────────────────────────────────── */
+    #file-list { margin-top: 18px; display: flex; flex-direction: column; gap: 8px; }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #fafbfd;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.88rem;
+    }
+    .file-item .file-icon { color: var(--orange); flex-shrink: 0; }
+    .file-item .file-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 500;
+    }
+    .file-item .file-size { color: var(--text-muted); font-size: 0.8rem; white-space: nowrap; }
+    .file-item .right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .remove-btn {
+      background: none; border: none; cursor: pointer;
+      color: #ccc; font-size: 1.15rem; line-height: 1; padding: 0 2px;
+      transition: color 0.15s;
+    }
+    .remove-btn:hover { color: var(--orange); }
+
+    /* Badges */
+    .badge {
+      font-size: 0.73rem; font-weight: 700;
+      padding: 2px 9px; border-radius: 20px; white-space: nowrap;
+    }
+    .badge-wait    { background: var(--blue-light); color: var(--blue); }
+    .badge-loading { background: #fff4e5; color: #b35c00; }
+    .badge-ok      { background: var(--green-light); color: var(--green); }
+    .badge-error   { background: #fdecea; color: #b71c1c; }
+
+    /* Progress bar */
+    .progress-wrap { width: 80px; height: 4px; background: var(--border); border-radius: 4px; overflow: hidden; }
+    .progress-bar  { height: 100%; width: 55%; background: var(--blue); border-radius: 4px;
+                     animation: indeterminate 1.2s ease-in-out infinite; }
+    @keyframes indeterminate {
+      0%   { transform: translateX(-100%); width: 60%; }
+      100% { transform: translateX(200%);  width: 60%; }
+    }
+
+    /* Download link */
+    .download-link {
+      color: var(--blue); font-size: 0.82rem; font-weight: 700;
+      text-decoration: none; white-space: nowrap;
+    }
+    .download-link:hover { text-decoration: underline; }
+
+    /* ── Buttons ─────────────────────────────────────── */
+    .btn-row { display: flex; gap: 10px; margin-top: 22px; }
+    .btn {
+      flex: 1; padding: 12px 18px; border: none; border-radius: 8px;
+      font-size: 0.97rem; font-weight: 700; cursor: pointer;
+      transition: background 0.18s, opacity 0.18s; letter-spacing: 0.01em;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary  { background: var(--blue); color: #fff; }
+    .btn-primary:not(:disabled):hover  { background: var(--blue-dark); }
+    .btn-secondary { background: var(--blue-light); color: var(--blue); border: 1.5px solid #aac4f0; }
+    .btn-secondary:not(:disabled):hover { background: #d5e5ff; }
+
+    /* ── Consolidated Banner ─────────────────────────── */
+    #consolidado-banner {
+      display: none;
+      margin-top: 18px;
+      background: var(--green-light);
+      border: 1.5px solid var(--green-border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      align-items: center;
+      gap: 14px;
+    }
+    #consolidado-banner p { flex: 1; font-size: 0.9rem; color: var(--green); }
+    #consolidado-banner p strong { font-weight: 700; }
+    .btn-green {
+      flex: none; padding: 10px 18px; background: var(--green);
+      color: #fff; font-size: 0.88rem; font-weight: 700;
+      border: none; border-radius: 8px; cursor: pointer;
+      transition: background 0.18s; white-space: nowrap;
+    }
+    .btn-green:hover:not(:disabled) { background: #165e2e; }
+    .btn-green:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ── Footer ──────────────────────────────────────── */
+    footer {
+      padding: 24px 16px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+      background: var(--white);
+    }
+    footer strong { color: var(--blue); }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <img src="/static/logo.png" alt="Rede Hospital Casa" />
+    <div class="topbar-divider"></div>
+    <div class="topbar-title">
+      <span>Conversor PDF → Excel</span>
+      <span>Relatórios de cotação Bionexo</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <h1>Converta relatórios <span>Bionexo</span> em Excel</h1>
+      <p>Faça upload dos PDFs de cotação e baixe a planilha formatada</p>
+    </div>
+
+    <div class="card">
+
+      <!-- Drop Zone -->
+      <div id="drop-zone" role="button" tabindex="0" aria-label="Área de upload de PDFs">
+        <svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" fill="none"
+             viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>
+        </svg>
+        <p>Arraste os PDFs aqui ou <span class="browse" id="browse-link">clique para selecionar</span></p>
+        <p class="hint">Apenas arquivos .pdf do sistema Bionexo</p>
+      </div>
+      <input type="file" id="file-input" accept=".pdf" multiple />
+
+      <!-- File List -->
+      <div id="file-list"></div>
+
+      <!-- Action Buttons -->
+      <div class="btn-row">
+        <button class="btn btn-primary"   id="convert-btn" disabled>Converter</button>
+        <button class="btn btn-secondary" id="clear-btn"   disabled>Limpar</button>
+      </div>
+
+      <!-- Consolidated Banner -->
+      <div id="consolidado-banner">
+        <p>Mesclar <strong id="consolidado-count"></strong> arquivos em uma única planilha</p>
+        <button class="btn-green" id="consolidado-btn">⬇ Baixar Consolidado</button>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    &copy; <strong>Rede Hospital Casa</strong> &nbsp;|&nbsp; Conversor Bionexo PDF → Excel &nbsp;|&nbsp; Uso interno
+  </footer>
+
+  <script>
+    const dropZone          = document.getElementById('drop-zone');
+    const fileInput         = document.getElementById('file-input');
+    const fileList          = document.getElementById('file-list');
+    const convertBtn        = document.getElementById('convert-btn');
+    const clearBtn          = document.getElementById('clear-btn');
+    const browseLink        = document.getElementById('browse-link');
+    const consolidadoBanner = document.getElementById('consolidado-banner');
+    const consolidadoCount  = document.getElementById('consolidado-count');
+    const consolidadoBtn    = document.getElementById('consolidado-btn');
+
+    let files  = [];
+    let nextId = 0;
+
+    function fmtSize(bytes) {
+      if (bytes < 1024)        return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function addFiles(newFiles) {
+      for (const f of newFiles) {
+        if (!f.name.toLowerCase().endsWith('.pdf')) continue;
+        if (files.some(e => e.file.name === f.name)) continue;
+        files.push({ file: f, id: nextId++, status: 'wait', url: null, outputName: null });
+      }
+      renderList();
+      updateButtons();
+    }
+
+    function removeFile(id) {
+      const entry = files.find(e => e.id === id);
+      if (entry && entry.url) URL.revokeObjectURL(entry.url);
+      files = files.filter(e => e.id !== id);
+      renderList();
+      updateButtons();
+    }
+
+    function renderList() {
+      fileList.innerHTML = '';
+      for (const entry of files) {
+        const item = document.createElement('div');
+        item.className = 'file-item';
+
+        // PDF icon
+        const icon = document.createElement('span');
+        icon.className = 'file-icon';
+        icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+        </svg>`;
+
+        const name = document.createElement('span');
+        name.className = 'file-name';
+        name.textContent = entry.file.name;
+        name.title = entry.file.name;
+
+        const size = document.createElement('span');
+        size.className = 'file-size';
+        size.textContent = fmtSize(entry.file.size);
+
+        const right = document.createElement('div');
+        right.className = 'right';
+
+        if (entry.status === 'loading') {
+          const pw = document.createElement('div');
+          pw.className = 'progress-wrap';
+          const pb = document.createElement('div');
+          pb.className = 'progress-bar';
+          pw.appendChild(pb);
+          right.appendChild(pw);
+        }
+
+        if (entry.status === 'ok' && entry.url) {
+          const dl = document.createElement('a');
+          dl.className = 'download-link';
+          dl.href = entry.url;
+          dl.download = entry.outputName || 'resultado.xlsx';
+          dl.textContent = '⬇ Baixar';
+          right.appendChild(dl);
+        }
+
+        const badge = document.createElement('span');
+        badge.className = 'badge ' + statusClass(entry.status);
+        badge.textContent = statusLabel(entry.status);
+        if (entry.status === 'error' && entry.errorMsg) badge.title = entry.errorMsg;
+        right.appendChild(badge);
+
+        if (entry.status !== 'loading') {
+          const rm = document.createElement('button');
+          rm.className = 'remove-btn';
+          rm.title = 'Remover';
+          rm.innerHTML = '&times;';
+          rm.onclick = () => removeFile(entry.id);
+          right.appendChild(rm);
+        }
+
+        item.appendChild(icon);
+        item.appendChild(name);
+        item.appendChild(size);
+        item.appendChild(right);
+        fileList.appendChild(item);
+      }
+    }
+
+    function statusClass(s) {
+      return { wait:'badge-wait', loading:'badge-loading', ok:'badge-ok', error:'badge-error' }[s] || 'badge-wait';
+    }
+    function statusLabel(s) {
+      return { wait:'Aguardando', loading:'Convertendo…', ok:'Concluído', error:'Erro' }[s] || s;
+    }
+
+    function updateButtons() {
+      const hasFiles   = files.length > 0;
+      const anyPending = files.some(e => e.status === 'wait');
+      const anyLoading = files.some(e => e.status === 'loading');
+      const doneFiles  = files.filter(e => e.status === 'ok');
+
+      convertBtn.disabled = !anyPending || anyLoading;
+      clearBtn.disabled   = !hasFiles || anyLoading;
+
+      if (doneFiles.length >= 2) {
+        consolidadoBanner.style.display = 'flex';
+        consolidadoCount.textContent = doneFiles.length;
+        consolidadoBtn.disabled = anyLoading;
+      } else {
+        consolidadoBanner.style.display = 'none';
+      }
+    }
+
+    async function convertAll() {
+      const pending = files.filter(e => e.status === 'wait');
+      if (!pending.length) return;
+
+      convertBtn.disabled = true;
+      clearBtn.disabled   = true;
+
+      for (const entry of pending) {
+        entry.status = 'loading';
+        renderList();
+
+        const formData = new FormData();
+        formData.append('pdf', entry.file);
+
+        try {
+          const resp = await fetch('/converter', { method: 'POST', body: formData });
+
+          if (resp.ok) {
+            const blob = await resp.blob();
+            const url  = URL.createObjectURL(blob);
+            const cd   = resp.headers.get('Content-Disposition') || '';
+            const match = cd.match(/filename\*?=(?:UTF-8''|")?([^";\n]+)/i);
+            const outputName = match
+              ? decodeURIComponent(match[1].replace(/"/g, ''))
+              : entry.file.name.replace(/\.pdf$/i, '.xlsx');
+            entry.status     = 'ok';
+            entry.url        = url;
+            entry.outputName = outputName;
+            entry.cacheToken = resp.headers.get('X-Cache-Token') || null;
+          } else {
+            let msg = 'Erro ao converter';
+            try { const j = await resp.json(); msg = j.error || msg; } catch {}
+            entry.status   = 'error';
+            entry.errorMsg = msg;
+          }
+        } catch (err) {
+          entry.status   = 'error';
+          entry.errorMsg = 'Falha de conexão: ' + err.message;
+        }
+
+        renderList();
+      }
+
+      updateButtons();
+    }
+
+    consolidadoBtn.addEventListener('click', async () => {
+      const doneFiles = files.filter(e => e.status === 'ok');
+      if (doneFiles.length < 2) return;
+
+      consolidadoBtn.disabled = true;
+      consolidadoBtn.textContent = 'Gerando…';
+
+      const tokens = doneFiles.map(e => e.cacheToken).filter(Boolean);
+
+      try {
+        const resp = await fetch('/consolidar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tokens })
+        });
+        if (resp.ok) {
+          const blob = await resp.blob();
+          const url  = URL.createObjectURL(blob);
+          const a    = document.createElement('a');
+          a.href = url; a.download = 'Consolidado_Bionexo.xlsx';
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+        } else {
+          let msg = 'Erro ao consolidar';
+          try { const j = await resp.json(); msg = j.error || msg; } catch {}
+          alert(msg);
+        }
+      } catch (err) {
+        alert('Falha de conexão: ' + err.message);
+      }
+
+      consolidadoBtn.disabled = false;
+      consolidadoBtn.textContent = '⬇ Baixar Consolidado';
+    });
+
+    // ── Events ──────────────────────────────────────────
+    browseLink.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('click', e => { if (e.target !== browseLink) fileInput.click(); });
+    dropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+
+    fileInput.addEventListener('change', () => {
+      addFiles(Array.from(fileInput.files));
+      fileInput.value = '';
+    });
+
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      addFiles(Array.from(e.dataTransfer.files));
+    });
+
+    convertBtn.addEventListener('click', convertAll);
+    clearBtn.addEventListener('click', () => {
+      files.forEach(e => { if (e.url) URL.revokeObjectURL(e.url); });
+      files = [];
+      renderList();
+      updateButtons();
+    });
+  </script>
+</body>
+</html>
